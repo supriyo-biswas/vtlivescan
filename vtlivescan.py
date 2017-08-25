@@ -18,7 +18,7 @@ def setup_logging(basedir):
     log_path = os.path.expanduser(basedir + '/app.log')
     logger = logging.getLogger()
 
-    handler = logging.handlers.RotatingFileHandler(log_path, maxBytes = 131072, backupCount = 3)
+    handler = logging.handlers.RotatingFileHandler(log_path, maxBytes=131072, backupCount=3)
     formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
 
     handler.setFormatter(formatter)
@@ -127,7 +127,7 @@ def check_file(path, vt_api_key):
         logging.warn('Unable to read file "' + path + '": ' + str(e))
 
 def monitor_dirs(paths, scan_exts, vt_api_key):
-    watcher = inotify.adapters.InotifyTrees(paths=paths, mask = inotify.constants.IN_CLOSE_WRITE | inotify.constants.IN_MOVED_TO)
+    watcher = inotify.adapters.InotifyTrees(paths=paths, mask=inotify.constants.IN_CLOSE_WRITE | inotify.constants.IN_MOVED_TO)
 
     try:
         for event in watcher.event_gen():
