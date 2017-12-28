@@ -43,9 +43,9 @@ def get_config(basedir):
             for path in user_config['paths']:
                 path = os.path.expanduser(path.encode())
                 if not os.path.isabs(path):
-                    logging.warn('"%s" is not an absolute path and was ignored' % (path,))
+                    logging.warn('"%s" is not an absolute path and was ignored' % path)
                 elif not os.path.isdir(path):
-                    logging.warn('"%s" is not a directory and was ignored' % (path,))
+                    logging.warn('"%s" is not a directory and was ignored' % path)
                 else:
                     config['paths'].add(path)
 
@@ -88,65 +88,71 @@ def check_file(path, vt_api_key):
 
                 hash.update(data)
 
-        params = {
+        response = requests.get('https://www.virustotal.com/vtapi/v2/file/report', params={
             'apikey': vt_api_key,
             'resource': hash.hexdigest()
-        }
-
-        response = requests.get('https://www.virustotal.com/vtapi/v2/file/report', params=params)
+        })
 
         if response.status_code != 200:
             notify('Malware check failed',
-                   "Failed to check %s for malware, probably because the rate limits were exceeded."
-                   % (path,),
+                   'Failed to check %s, probably because the rate limits were exceeded' % path,
                    'dialog-information')
-        else:
-            jsonresponse = response.json()
+            return
 
-            if 'positives' in jsonresponse and 'total' in jsonresponse:
-                positives = jsonresponse['positives']
-                total = jsonresponse['total']
+        jsonresponse = response.json()
 
-                for antivirus in jsonresponse['scans'].keys():
-                    if jsonresponse['scans'][antivirus]['detected']:
-                        virusname = jsonresponse['scans'][antivirus]['result']
-                        break
+        if 'positives' in jsonresponse and 'total' in jsonresponse:
+            positives = jsonresponse['positives']
+            total = jsonresponse['total']
 
-                if positives > 0:
-                    notify('Potential malware detected',
-                           'File: %s\n'
-                           'Malware family: %s (%s)\n'
-                           'Detection Ratio: %i/%i (%f%%)'
-                           % (path, virusname, antivirus, positives, total, 100 * positives/total),
-                           'dialog-warning',
-                           120)
+            for av, res in jsonresponse['scans'].items():
+                if res['detected']:
+                    virusname = res['result']
+                    break
+
+            if positives > 0:
+                notify('Potential malware detected',
+                       'File: %s\n'
+                       'Malware family: %s (%s)\n'
+                       'Detection Ratio: %i/%i (%.2f%%)'
+                       % (path, virusname, av, positives, total, 100 * positives/total),
+                       'dialog-warning',
+                       1200)
 
     except requests.exceptions.RequestException as e:
-        logging.warn('Unable to check file "' + path + '": ' + str(e))
+        logging.warn('Unable to check file "%s": %s' % (path, str(e)))
     except IOError as e:
-        logging.warn('Unable to read file "' + path + '": ' + str(e))
+        logging.warn('Unable to read file "%s": %s' % (path, str(e)))
 
 def monitor_dirs(paths, scan_exts, vt_api_key):
-    watcher = inotify.adapters.InotifyTrees(paths=paths, mask=inotify.constants.IN_CLOSE_WRITE | inotify.constants.IN_MOVED_TO)
+    watcher = inotify.adapters.InotifyTrees(paths=paths,
+        mask=inotify.constants.IN_CLOSE_WRITE | inotify.constants.IN_MOVED_TO)
 
     try:
         for event in watcher.event_gen():
-            if event is not None and event[0].mask in [inotify.constants.IN_CLOSE_WRITE, inotify.constants.IN_MOVED_TO]:
+            if event is not None and event[0].mask in [
+                inotify.constants.IN_CLOSE_WRITE,
+                inotify.constants.IN_MOVED_TO
+            ]:
                 filename = event[3].decode('utf-8')
                 ext = os.path.splitext(filename)[1][1:].lower()
 
                 if ext in scan_exts:
-                    path = event[2].decode('utf-8') + '/' + filename
+                    path = os.path.join(event[2].decode('utf-8'), filename)
                     checker = multiprocessing.Process(target=check_file, args=(path, vt_api_key))
                     checker.start()
     finally:
         for path in paths:
             watcher.remove_watch(path)
 
-basedir = os.path.expanduser('~/.vtlivescan')
+def main():
+    basedir = os.path.expanduser('~/.vtlivescan')
 
-setup_dirs(basedir)
-setup_logging(basedir)
+    setup_dirs(basedir)
+    setup_logging(basedir)
 
-config = get_config(basedir)
-monitor_dirs(list(config['paths']), config['extensions'], config['vt_api_key'])
+    config = get_config(basedir)
+    monitor_dirs(list(config['paths']), config['extensions'], config['vt_api_key'])
+
+if __name__ == '__main__':
+    main()

@@ -21,14 +21,15 @@ pip3 install git+https://github.com/supriyo-biswas/PyInotify@patch-1 requests
 * Install notify-send. On Ubuntu/Debian, you need to run:
 
 ```bash
-sudo apt install notify-send
+apt install notify-send
 ```
 
-* Create `~/.vtlivescan/config.json` and add in your VirusTotal API key like so.
+* Create `/.vtlivescan/config.json` and add in the Virustotal API key and the paths to monitor. VirusTotal API keys are available for free with an account on virustotal.com (though it has a rate limit of 4 requests/second). Do not use comments in the file; JSON does not support them.
 
 ```js
 {
-	"vt_api_key": "<YOUR VIRUSTOTAL API KEY GOES HERE>",
+	// Your VirusTotal API key.
+	"vt_api_key": "...",
 	// Optional, defaults to ~/Downloads.
 	// It's preferable not to use directories with many (nested) subdirectories.
 	"paths": [
